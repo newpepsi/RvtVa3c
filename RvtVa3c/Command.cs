@@ -5,7 +5,10 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Text;
 using System.Windows.Interop;
+
 using Autodesk.Revit.ApplicationServices;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
@@ -18,7 +21,7 @@ using DialogResult = System.Windows.Forms.DialogResult;
 
 namespace RvtVa3c
 {
-  [Transaction( TransactionMode.Manual )]
+  [Transaction(TransactionMode.Manual)]
   public class Command : IExternalCommand
   {
     /// <summary>
@@ -30,21 +33,17 @@ namespace RvtVa3c
     System.Reflection.Assembly
       CurrentDomain_AssemblyResolve(
         object sender,
-        ResolveEventArgs args )
+        ResolveEventArgs args)
     {
-      if( args.Name.Contains( "Newtonsoft" ) )
+      if (args.Name.Contains("Newtonsoft"))
       {
-        string filename = Path.GetDirectoryName(
-          System.Reflection.Assembly
-            .GetExecutingAssembly().Location );
+        string filename = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
 
-        filename = Path.Combine( filename,
-          "Newtonsoft.Json.dll" );
+        filename = Path.Combine(filename, "Newtonsoft.Json.dll");
 
-        if( File.Exists( filename ) )
+        if (File.Exists(filename))
         {
-          return System.Reflection.Assembly
-            .LoadFrom( filename );
+          return System.Reflection.Assembly.LoadFrom(filename);
         }
       }
       return null;
@@ -54,20 +53,14 @@ namespace RvtVa3c
     /// Export a given 3D view to JSON using
     /// our custom exporter context.
     /// </summary>
-    public void ExportView3D( 
-      View3D view3d, 
-      string filename )
+    public void ExportView3D(View3D view3d, string filename)
     {
-      AppDomain.CurrentDomain.AssemblyResolve
-        += CurrentDomain_AssemblyResolve;
 
+      AppDomain.CurrentDomain.AssemblyResolve += CurrentDomain_AssemblyResolve;
       Document doc = view3d.Document;
-
-      Va3cExportContext context
-        = new Va3cExportContext( doc, filename );
-
-      CustomExporter exporter = new CustomExporter(
-        doc, context );
+      Va3cExportContext context = new Va3cExportContext(doc, filename);
+      context.SetVertex(view3d.Scale);
+      CustomExporter exporter = new CustomExporter(doc, context);
 
       // Note: Excluding faces just suppresses the 
       // OnFaceBegin calls, not the actual processing 
@@ -75,10 +68,8 @@ namespace RvtVa3c
       // will still be received by the context.
       //
       //exporter.IncludeFaces = false; // removed in Revit 2017
-
       exporter.ShouldStopOnError = false;
-
-      exporter.Export( view3d );
+      exporter.Export(view3d);
     }
 
     #region UI to Filter Parameters
@@ -92,31 +83,31 @@ namespace RvtVa3c
     /// </summary>
     /// <param name="doc">Revit Document</param>
     /// <param name="includeType">Include Type Parameters in the filter dialog</param>
-    public void filterElementParameters( Document doc, bool includeType )
+    public void filterElementParameters(Document doc, bool includeType)
     {
       _parameterDictionary = new Dictionary<string, List<string>>();
       _toExportDictionary = new Dictionary<string, List<string>>();
 
-      FilteredElementCollector collector = new FilteredElementCollector( doc, doc.ActiveView.Id );
+      FilteredElementCollector collector = new FilteredElementCollector(doc, doc.ActiveView.Id);
 
       // Create a dictionary with all the properties for each category.
 
-      foreach( var fi in collector )
+      foreach (var fi in collector)
       {
 
         string category = fi.Category.Name;
 
-        if( category != "Title Blocks" && category != "Generic Annotations" && category != "Detail Items" && category != "Cameras" )
+        if (category != "Title Blocks" && category != "Generic Annotations" && category != "Detail Items" && category != "Cameras")
         {
           IList<Parameter> parameters = fi.GetOrderedParameters();
           List<string> parameterNames = new List<string>();
 
-          foreach( Parameter p in parameters )
+          foreach (Parameter p in parameters)
           {
             string pName = p.Definition.Name;
             string tempVal = "";
 
-            if( StorageType.String == p.StorageType )
+            if (StorageType.String == p.StorageType)
             {
               tempVal = p.AsString();
             }
@@ -124,41 +115,41 @@ namespace RvtVa3c
             {
               tempVal = p.AsValueString();
             }
-            if( !string.IsNullOrEmpty( tempVal ) )
+            if (!string.IsNullOrEmpty(tempVal))
             {
-              if( _parameterDictionary.ContainsKey( category ) )
+              if (_parameterDictionary.ContainsKey(category))
               {
-                if( !_parameterDictionary[category].Contains( pName ) )
+                if (!_parameterDictionary[category].Contains(pName))
                 {
-                  _parameterDictionary[category].Add( pName );
+                  _parameterDictionary[category].Add(pName);
                 }
               }
               else
               {
-                parameterNames.Add( pName );
+                parameterNames.Add(pName);
               }
             }
           }
-          if( parameterNames.Count > 0 )
+          if (parameterNames.Count > 0)
           {
-            _parameterDictionary.Add( category, parameterNames );
+            _parameterDictionary.Add(category, parameterNames);
           }
-          if( includeType )
+          if (includeType)
           {
             ElementId idType = fi.GetTypeId();
 
-            if( ElementId.InvalidElementId != idType )
+            if (ElementId.InvalidElementId != idType)
             {
-              Element typ = doc.GetElement( idType );
+              Element typ = doc.GetElement(idType);
               parameters = typ.GetOrderedParameters();
               List<string> parameterTypes = new List<string>();
-              foreach( Parameter p in parameters )
+              foreach (Parameter p in parameters)
               {
                 string pName = "Type " + p.Definition.Name;
                 string tempVal = "";
-                if( !_parameterDictionary[category].Contains( pName ) )
+                if (!_parameterDictionary[category].Contains(pName))
                 {
-                  if( StorageType.String == p.StorageType )
+                  if (StorageType.String == p.StorageType)
                   {
                     tempVal = p.AsString();
                   }
@@ -167,25 +158,25 @@ namespace RvtVa3c
                     tempVal = p.AsValueString();
                   }
 
-                  if( !string.IsNullOrEmpty( tempVal ) )
+                  if (!string.IsNullOrEmpty(tempVal))
                   {
-                    if( _parameterDictionary.ContainsKey( category ) )
+                    if (_parameterDictionary.ContainsKey(category))
                     {
-                      if( !_parameterDictionary[category].Contains( pName ) )
+                      if (!_parameterDictionary[category].Contains(pName))
                       {
-                        _parameterDictionary[category].Add( pName );
+                        _parameterDictionary[category].Add(pName);
                       }
                     }
                     else
                     {
-                      parameterTypes.Add( pName );
+                      parameterTypes.Add(pName);
                     }
                   }
                 }
               }
-              if( parameterTypes.Count > 0 )
+              if (parameterTypes.Count > 0)
               {
-                _parameterDictionary[category].AddRange( parameterTypes );
+                _parameterDictionary[category].AddRange(parameterTypes);
               }
             }
 
@@ -198,51 +189,51 @@ namespace RvtVa3c
       _filter = new ParameterFilter();
 
       _tabControl = new TabControl();
-      _tabControl.Size = new System.Drawing.Size( 600, 375 );
-      _tabControl.Location = new System.Drawing.Point( 0, 55 );
-      _tabControl.Anchor = ( (System.Windows.Forms.AnchorStyles) ( ( ( ( System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom )
-          | System.Windows.Forms.AnchorStyles.Left )
-          | System.Windows.Forms.AnchorStyles.Right ) ) );
+      _tabControl.Size = new System.Drawing.Size(600, 375);
+      _tabControl.Location = new System.Drawing.Point(0, 55);
+      _tabControl.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)
+          | System.Windows.Forms.AnchorStyles.Left)
+          | System.Windows.Forms.AnchorStyles.Right)));
 
       int j = 8;
 
       // Populate the parameters as a checkbox in each tab
-      foreach( string c in _parameterDictionary.Keys )
+      foreach (string c in _parameterDictionary.Keys)
       {
         //Create a checklist
         CheckedListBox checkList = new CheckedListBox();
 
         //set the properties of the checklist
-        checkList.Anchor = ( (System.Windows.Forms.AnchorStyles) ( ( System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right ) ) );
+        checkList.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
         checkList.FormattingEnabled = true;
         checkList.HorizontalScrollbar = true;
-        checkList.Items.AddRange( _parameterDictionary[c].ToArray() );
+        checkList.Items.AddRange(_parameterDictionary[c].ToArray());
         checkList.MultiColumn = true;
-        checkList.Size = new System.Drawing.Size( 560, 360 );
+        checkList.Size = new System.Drawing.Size(560, 360);
         checkList.ColumnWidth = 200;
         checkList.CheckOnClick = true;
         checkList.TabIndex = j;
         j++;
 
-        for( int i = 0; i <= ( checkList.Items.Count - 1 ); i++ )
+        for (int i = 0; i <= (checkList.Items.Count - 1); i++)
         {
-          checkList.SetItemCheckState( i, CheckState.Checked );
+          checkList.SetItemCheckState(i, CheckState.Checked);
         }
 
         //add a tab
-        TabPage tab = new TabPage( c );
+        TabPage tab = new TabPage(c);
         tab.Name = c;
 
         //attach the checklist to the tab
-        tab.Controls.Add( checkList );
+        tab.Controls.Add(checkList);
 
         // attach the tab to the tab control
-        _tabControl.TabPages.Add( tab );
+        _tabControl.TabPages.Add(tab);
       }
 
       // Attach the tab control to the filter form
 
-      _filter.Controls.Add( _tabControl );
+      _filter.Controls.Add(_tabControl);
 
       // Display filter ui
 
@@ -250,14 +241,14 @@ namespace RvtVa3c
 
       // Loop thru each tab and get the parameters to export
 
-      foreach( TabPage tab in _tabControl.TabPages )
+      foreach (TabPage tab in _tabControl.TabPages)
       {
         List<string> parametersToExport = new List<string>();
-        foreach( var checkedP in ( (CheckedListBox) tab.Controls[0] ).CheckedItems )
+        foreach (var checkedP in ((CheckedListBox)tab.Controls[0]).CheckedItems)
         {
-          parametersToExport.Add( checkedP.ToString() );
+          parametersToExport.Add(checkedP.ToString());
         }
-        _toExportDictionary.Add( tab.Name, parametersToExport );
+        _toExportDictionary.Add(tab.Name, parametersToExport);
       }
     }
     #endregion // UI to Filter Parameters
@@ -275,15 +266,15 @@ namespace RvtVa3c
     /// </summary>
     static bool SelectFile(
       ref string folder_path,
-      ref string filename )
+      ref string filename)
     {
       SaveFileDialog dlg = new SaveFileDialog();
 
-      dlg.Title = "Select JSON Output File";
-      dlg.Filter = "JSON files|*.js";
+      dlg.Title = "选择要输出的JSON文件名";
+      dlg.Filter = "JSON 文件|*.json";
 
-      if( null != folder_path
-        && 0 < folder_path.Length )
+      if (null != folder_path
+        && 0 < folder_path.Length)
       {
         dlg.InitialDirectory = folder_path;
       }
@@ -292,95 +283,99 @@ namespace RvtVa3c
 
       bool rc = DialogResult.OK == dlg.ShowDialog();
 
-      if( rc )
+      if (rc)
       {
-        filename = Path.Combine( dlg.InitialDirectory,
-          dlg.FileName );
+        filename = Path.Combine(dlg.InitialDirectory,
+          dlg.FileName);
 
         folder_path = Path.GetDirectoryName(
-          filename );
+          filename);
       }
       return rc;
     }
     #endregion // SelectFile
 
-    public Result Execute(
-      ExternalCommandData commandData,
-      ref string message,
-      ElementSet elements )
+    public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
     {
       UIApplication uiapp = commandData.Application;
       UIDocument uidoc = uiapp.ActiveUIDocument;
-      Autodesk.Revit.ApplicationServices.Application app 
-        = uiapp.Application;
+      Autodesk.Revit.ApplicationServices.Application app = uiapp.Application;
+
       Document doc = uidoc.Document;
 
+
       // Check that we are in a 3D view.
+      string url = "http://www.baidu.com";
+      HttpWebRequest request = (HttpWebRequest)HttpWebRequest.Create(url);
+      request.Method = "GET";
+      request.ContentType = "text/html;charset=UTF-8";
+      HttpWebResponse resp = (HttpWebResponse)request.GetResponse();
+      Stream respStream = resp.GetResponseStream();
+      StreamReader reader = new StreamReader(respStream, Encoding.UTF8);
+      Debug.WriteLine("response:"+reader.ReadToEnd());
+
+
 
       View3D view = doc.ActiveView as View3D;
 
-      if( null == view )
+      if (null == view)
       {
-        Util.ErrorMsg(
-          "You must be in a 3D view to export." );
-
+        Util.ErrorMsg("请在{三维}视图中使用导出插件");
         return Result.Failed;
       }
 
       // Prompt for output filename selection.
 
+
       string filename = doc.PathName;
 
-      if( 0 == filename.Length )
+      if (0 == filename.Length)
       {
         filename = doc.Title;
       }
 
-      if( null == _output_folder_path )
+      if (null == _output_folder_path)
       {
         // Sometimes the command fails if the file is 
         // detached from central and not saved locally
 
         try
         {
-          _output_folder_path = Path.GetDirectoryName(
-            filename );
+          _output_folder_path = Path.GetDirectoryName(filename);
         }
         catch
         {
-          TaskDialog.Show( "Folder not found",
-            "Please save the file and run the command again." );
+          TaskDialog.Show("文件夹不存在", "Please save the file and run the command again.");
           return Result.Failed;
         }
       }
 
-      filename = Path.GetFileName( filename ) + ".js";
+      filename = Path.GetFileName(filename) + ".json";
 
-      if( !SelectFile( ref _output_folder_path,
-        ref filename ) )
+      if (!SelectFile(ref _output_folder_path,
+        ref filename))
       {
         return Result.Cancelled;
       }
 
-      filename = Path.Combine( _output_folder_path, 
-        filename );
+      filename = Path.Combine(_output_folder_path, filename);
 
       // Ask user whether to interactively choose 
       // which parameters to export or just export 
       // them all.
 
-      TaskDialog td = new TaskDialog( "Ask user to filter parameters" );
-      td.Title = "Filter parameters";
+      TaskDialog td = new TaskDialog("询问用户过滤导出内容");
+      td.Title = "过滤参数";
       td.CommonButtons = TaskDialogCommonButtons.No | TaskDialogCommonButtons.Yes;
-      td.MainInstruction = "Do you want to filter the parameters of the objects to be exported?";
-      td.MainContent = "Click Yes and you will be able to select parameters for each category in the next window";
+      td.MainInstruction = "你需要对导出的内容进行过滤么？";
+      td.MainContent = "点击是以后你将在弹窗的窗口中过滤每个类别的内容";
       td.AllowCancellation = true;
-      td.VerificationText = "Check this to include type properties";
+      td.VerificationText = "勾选此处连同类型属性一同导出";
 
-      if( TaskDialogResult.Yes == td.Show() )
+      if (TaskDialogResult.Yes == td.Show())
       {
-        filterElementParameters( doc, td.WasVerificationChecked() );
-        if( ParameterFilter.status == "cancelled" )
+        filterElementParameters(doc, td.WasVerificationChecked());
+        if (ParameterFilter.status == "cancelled")
         {
           ParameterFilter.status = "";
           return Result.Cancelled;
@@ -389,8 +384,7 @@ namespace RvtVa3c
 
       // Save file.
 
-      ExportView3D( doc.ActiveView as View3D,
-        filename );
+      ExportView3D(doc.ActiveView as View3D, filename);
 
       return Result.Succeeded;
     }

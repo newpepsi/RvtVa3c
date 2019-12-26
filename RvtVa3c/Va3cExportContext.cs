@@ -7,6 +7,7 @@ using System.IO;
 using Autodesk.Revit.DB;
 //using Autodesk.Revit.Utility;
 using Newtonsoft.Json;
+using Autodesk.Revit.Utility;
 #endregion // Namespaces
 
 namespace RvtVa3c
@@ -54,6 +55,12 @@ namespace RvtVa3c
     /// Y up.
     /// </summary>
     bool _switch_coordinates = true;
+
+    public void SetVertex(int scale)
+    {
+      _scale_vertex /= scale;
+      //throw new NotImplementedException();
+    }
 
     #region VertexLookupXyz
     /// <summary>
@@ -621,13 +628,12 @@ namespace RvtVa3c
     }
 
     // Removed in Revit 2017:
-    //public void OnDaylightPortal( DaylightPortalNode node )
-    //{
-    //  Debug.WriteLine( "OnDaylightPortal: " + node.NodeName );
-    //  Asset asset = node.GetAsset();
-    //  Debug.WriteLine( "OnDaylightPortal: Asset:"
-    //    + ( ( asset != null ) ? asset.Name : "Null" ) );
-    //}
+    public void OnDaylightPortal( DaylightPortalNode node )
+    {
+      Debug.WriteLine( "OnDaylightPortal: " + node.NodeName );
+      Asset asset = node.GetAsset();
+      Debug.WriteLine( "OnDaylightPortal: Asset:" + ( ( asset != null ) ? asset.Name : "Null" ) );
+    }
 
     public void OnRPC( RPCNode node )
     {
@@ -639,9 +645,7 @@ namespace RvtVa3c
 
     public RenderNodeAction OnViewBegin( ViewNode node )
     {
-      Debug.WriteLine( "OnViewBegin: "
-        + node.NodeName + "(" + node.ViewId.IntegerValue
-        + "): LOD: " + node.LevelOfDetail );
+      Debug.WriteLine( "OnViewBegin: " + node.NodeName + "(" + node.ViewId.IntegerValue + "): LOD: " + node.LevelOfDetail );
 
       return RenderNodeAction.Proceed;
     }
@@ -652,15 +656,12 @@ namespace RvtVa3c
       // Note: This method is invoked even for a view that was skipped.
     }
 
-    public RenderNodeAction OnElementBegin(
-      ElementId elementId )
+    public RenderNodeAction OnElementBegin( ElementId elementId )
     {
       Element e = _doc.GetElement( elementId );
       string uid = e.UniqueId;
 
-      Debug.WriteLine( string.Format(
-        "OnElementBegin: id {0} category {1} name {2}",
-        elementId.IntegerValue, e.Category.Name, e.Name ) );
+      Debug.WriteLine( string.Format( "OnElementBegin: id {0} category {1} name {2}", elementId.IntegerValue, e.Category.Name, e.Name ) );
 
       if( _objects.ContainsKey( uid ) )
       {
@@ -683,10 +684,7 @@ namespace RvtVa3c
 
       if( 1 < n )
       {
-        Debug.Print( "{0} has {1} materials: {2}",
-          Util.ElementDescription( e ), n,
-          string.Join( ", ", idsMaterialGeometry.Select(
-            id => _doc.GetElement( id ).Name ) ) );
+        Debug.Print( "{0} has {1} materials: {2}", Util.ElementDescription( e ), n, string.Join( ", ", idsMaterialGeometry.Select( id => _doc.GetElement( id ).Name ) ) );
       }
 
       // We handle a current element, which may either
@@ -707,8 +705,7 @@ namespace RvtVa3c
       _currentGeometry = new Dictionary<string, Va3cContainer.Va3cGeometry>();
       _vertices = new Dictionary<string, VertexLookupInt>();
 
-      if( null != e.Category
-        && null != e.Category.Material )
+      if( null != e.Category && null != e.Category.Material )
       {
         SetCurrentMaterial( e.Category.Material.UniqueId );
       }
@@ -725,9 +722,7 @@ namespace RvtVa3c
       Element e = _doc.GetElement( id );
       string uid = e.UniqueId;
 
-      Debug.WriteLine( string.Format(
-        "OnElementEnd: id {0} category {1} name {2}",
-        id.IntegerValue, e.Category.Name, e.Name ) );
+      Debug.WriteLine(string.Format("OnElementEnd: id {0} category {1} name {2}", id.IntegerValue, e.Category.Name, e.Name));
 
       if( _objects.ContainsKey( uid ) )
       {
@@ -763,8 +758,7 @@ namespace RvtVa3c
         _currentElement.children.Add( obj );
       }
 
-      Dictionary<string, string> d
-        = Util.GetElementProperties( e, true );
+      Dictionary<string, string> d = Util.GetElementProperties( e, true );
 
       _currentElement.userData = d;
 
@@ -784,7 +778,7 @@ namespace RvtVa3c
 
       //Debug.Assert( false, "we set exporter.IncludeFaces false" ); // removed in Revit 2017
 
-      Debug.WriteLine( "  OnFaceBegin: " + node.NodeName );
+      //Debug.WriteLine( "  OnFaceBegin: " + node.NodeName );
       return RenderNodeAction.Proceed;
     }
 
@@ -795,20 +789,18 @@ namespace RvtVa3c
 
       //Debug.Assert( false, "we set exporter.IncludeFaces false" ); // removed in Revit 2017
 
-      Debug.WriteLine( "  OnFaceEnd: " + node.NodeName );
+      // Debug.WriteLine( "  OnFaceEnd: " + node.NodeName );
 
       // Note: This method is invoked even for faces that were skipped.
     }
 
     public RenderNodeAction OnInstanceBegin( InstanceNode node )
     {
-      Debug.WriteLine( "  OnInstanceBegin: " + node.NodeName 
-        + " symbol: " + node.GetSymbolId().IntegerValue );
+      Debug.WriteLine( "  OnInstanceBegin: " + node.NodeName + " symbol: " + node.GetSymbolId().IntegerValue );
 
       // This method marks the start of processing a family instance
 
-      _transformationStack.Push( CurrentTransform.Multiply( 
-        node.GetTransform() ) );
+      _transformationStack.Push( CurrentTransform.Multiply( node.GetTransform() ) );
 
       // We can either skip this instance or proceed with rendering it.
       return RenderNodeAction.Proceed;
@@ -834,6 +826,7 @@ namespace RvtVa3c
       // Note: This method is invoked even for instances that were skipped.
       _transformationStack.Pop();
     }
+
 
     public void OnLight( LightNode node )
     {
