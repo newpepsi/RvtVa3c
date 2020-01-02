@@ -56,6 +56,10 @@ namespace RvtVa3c
     /// </summary>
     bool _switch_coordinates = true;
 
+    /// <summary>
+    /// 根据3d场景中设置的比例对导出场景进行缩放
+    /// </summary>
+    /// <param name="scale"></param>
     public void SetVertex(int scale)
     {
       _scale_vertex /= scale;

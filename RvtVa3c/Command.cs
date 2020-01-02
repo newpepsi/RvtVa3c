@@ -305,7 +305,7 @@ namespace RvtVa3c
 
 
       // Check that we are in a 3D view.
-      string url = "http://www.baidu.com";
+      /*string url = "http://www.baidu.com";
       HttpWebRequest request = (HttpWebRequest)HttpWebRequest.Create(url);
       request.Method = "GET";
       request.ContentType = "text/html;charset=UTF-8";
@@ -313,6 +313,7 @@ namespace RvtVa3c
       Stream respStream = resp.GetResponseStream();
       StreamReader reader = new StreamReader(respStream, Encoding.UTF8);
       Debug.WriteLine("response:"+reader.ReadToEnd());
+      */
 
 
 
@@ -352,8 +353,7 @@ namespace RvtVa3c
 
       filename = Path.GetFileName(filename) + ".json";
 
-      if (!SelectFile(ref _output_folder_path,
-        ref filename))
+      if (!SelectFile(ref _output_folder_path, ref filename))
       {
         return Result.Cancelled;
       }
